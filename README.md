@@ -554,3 +554,9 @@ In development (no Docker):
 |---|---|
 | Rust backend | 3000 |
 | Vite dev server | 5173 |
+
+
+## License
+
+This project is licensed under the [Polyform Noncommercial License 1.0.0](LICENSE). 
+Contributions are welcome, but commercial use or resale of this software is strictly prohibited.
