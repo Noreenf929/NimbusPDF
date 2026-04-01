@@ -14,3 +14,5 @@ frontend/build/
 .DS_Store
 *.swp
 .claude/
+CLAUDE.md
+.claude/*.json
