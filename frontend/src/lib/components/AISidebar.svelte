@@ -59,7 +59,12 @@
     }
   }
 
-  function clearChat() {
+  async function clearChat() {
+    try {
+      await api.delete(`/ai/history/${docId}`)
+    } catch {
+      // best-effort — clear locally regardless
+    }
     messages = []
   }
 </script>

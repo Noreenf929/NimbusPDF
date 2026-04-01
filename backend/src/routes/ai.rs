@@ -19,7 +19,7 @@ pub fn router() -> Router<AppState> {
         .route("/chat", post(chat))
         .route("/summary", post(quick_summary))
         .route("/keypoints", post(quick_keypoints))
-        .route("/history/:doc_id", get(get_history))
+        .route("/history/:doc_id", get(get_history).delete(clear_history))
         .route("/config", get(get_ai_config).post(save_ai_config))
 }
 
@@ -277,6 +277,23 @@ async fn get_history(
     let history: Vec<serde_json::Value> =
         serde_json::from_str(&history_str).unwrap_or_default();
     Ok(Json(history))
+}
+
+async fn clear_history(
+    State(state): State<AppState>,
+    Extension(handle): Extension<SessionHandle>,
+    Path(doc_id): Path<String>,
+) -> Result<StatusCode, StatusCode> {
+    let principal = Principal::from_session(&handle.data);
+    let storage = Arc::clone(&state.storage);
+    spawn_blocking(move || {
+        storage.write_doc_file(&principal, &doc_id, "chat_history.json", "[]")
+    })
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn get_ai_config(

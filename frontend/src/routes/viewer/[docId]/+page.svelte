@@ -1,5 +1,6 @@
 <!-- PDF viewer page: toolbar + PDF canvas + AI sidebar + Notes drawer -->
 <script>
+  import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import PDFViewer from '$components/PDFViewer.svelte';
   import AISidebar from '$components/AISidebar.svelte';
@@ -10,7 +11,9 @@
   let sidebarOpen = true;
   let notesOpen = false;
 
-  $: pdfStore.load(docId);
+  onMount(() => {
+    pdfStore.load(docId);
+  });
 </script>
 
 <div class="flex flex-col h-screen overflow-hidden">
