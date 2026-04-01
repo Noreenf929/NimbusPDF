@@ -49,8 +49,8 @@
     loading = true
     try {
       const endpoint = action === 'summary' ? '/ai/summary' : '/ai/keypoints'
-      const { reply } = await api.post(endpoint, { doc_id: docId })
-      messages = [...messages, { role: 'assistant', content: reply }]
+      const { result } = await api.post(endpoint, { doc_id: docId })
+      messages = [...messages, { role: 'assistant', content: result }]
     } catch (e) {
       messages = [...messages, { role: 'assistant', content: `Error: ${e.message}` }]
     } finally {

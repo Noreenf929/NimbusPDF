@@ -308,7 +308,7 @@ async fn save_ai_config(
     State(state): State<AppState>,
     Extension(handle): Extension<SessionHandle>,
     Json(body): Json<SaveAiConfigBody>,
-) -> Result<StatusCode, (StatusCode, Json<serde_json::Value>)> {
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, Json<serde_json::Value>)> {
     let principal = Principal::from_session(&handle.data);
     let storage = Arc::clone(&state.storage);
 
@@ -338,5 +338,7 @@ async fn save_ai_config(
         Json(serde_json::json!({ "error": e.to_string() })),
     ))?;
 
-    Ok(StatusCode::OK)
+    Ok( (
+        StatusCode::OK, Json(serde_json::json!({ "sucess": true }))
+    ))
 }
