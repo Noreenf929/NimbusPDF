@@ -218,9 +218,12 @@
   // ── Highlights ───────────────────────────────────────────────────────────
 
   function onMouseUp(event) {
+    // If the color picker is already visible, let the backdrop / button click
+    // handlers manage it — don't dismiss it on the mouseup that precedes the click.
+    if (pickerVisible) return
+
     const selection = window.getSelection()
     if (!selection || selection.isCollapsed) {
-      dismissPicker()
       return
     }
 

@@ -26,6 +26,7 @@ pub fn router() -> Router<AppState> {
         .route("/gdrive/callback", get(gdrive_callback))
         .route("/gdrive/disconnect", get(gdrive_disconnect))
         .route("/me", get(me))
+        .route("/clear-cache", axum::routing::post(clear_cache))
 }
 
 #[derive(Deserialize)]
@@ -474,6 +475,48 @@ async fn gdrive_disconnect(
     let _ = spawn_blocking(move || store.save(&session_data)).await;
 
     StatusCode::OK
+}
+
+/// Delete all session data and anonymous storage, then expire the cookie.
+/// Authenticated users only lose their session; their stored documents remain.
+async fn clear_cache(
+    State(state): State<AppState>,
+    Extension(session): Extension<SessionHandle>,
+) -> impl IntoResponse {
+    let principal = Principal::from_session(&session.data);
+    let sid = session.data.session_id.clone();
+    let is_anonymous = session.data.user.is_none();
+
+    // For anonymous sessions, remove the entire data directory
+    if is_anonymous {
+        let storage = Arc::clone(&state.storage);
+        let principal_clone = principal.clone();
+        let _ = spawn_blocking(move || {
+            let root = storage.root_for(&principal_clone);
+            if root.exists() {
+                let _ = std::fs::remove_dir_all(&root);
+            }
+        })
+        .await;
+    }
+
+    // Delete the session file
+    let store = Arc::clone(&state.session_store);
+    let _ = spawn_blocking(move || store.delete(&sid)).await;
+
+    // Expire the session cookie
+    let cookie_name = &state.config.session.cookie_name;
+    let clear_cookie = format!(
+        "{}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
+        cookie_name
+    );
+
+    let mut resp = Json(serde_json::json!({ "ok": true })).into_response();
+    if let Ok(val) = axum::http::HeaderValue::from_str(&clear_cookie) {
+        resp.headers_mut()
+            .insert(axum::http::header::SET_COOKIE, val);
+    }
+    resp
 }
 
 async fn me(

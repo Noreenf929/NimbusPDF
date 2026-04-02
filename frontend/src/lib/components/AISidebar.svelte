@@ -16,6 +16,8 @@
   let input = ''
   let loading = false
   let chatEl
+  let availableModels = []
+  let selectedModel = ''
 
   onMount(async () => {
     try {
@@ -26,6 +28,12 @@
     } catch {
       // history unavailable — start fresh
     }
+    try {
+      const { models } = await api.get('/ai/models')
+      if (Array.isArray(models)) availableModels = models
+    } catch {
+      // models unavailable — dropdown stays hidden
+    }
   })
 
   async function send() {
@@ -35,7 +43,9 @@
     messages = [...messages, { role: 'user', content: userMsg }]
     loading = true
     try {
-      const { reply } = await api.post('/ai/chat', { doc_id: docId, message: userMsg })
+      const payload = { doc_id: docId, message: userMsg }
+      if (selectedModel) payload.model = selectedModel
+      const { reply } = await api.post('/ai/chat', payload)
       messages = [...messages, { role: 'assistant', content: reply }]
     } catch (e) {
       messages = [...messages, { role: 'assistant', content: `Error: ${e.message}` }]
@@ -49,7 +59,9 @@
     loading = true
     try {
       const endpoint = action === 'summary' ? '/ai/summary' : '/ai/keypoints'
-      const { result } = await api.post(endpoint, { doc_id: docId })
+      const payload = { doc_id: docId }
+      if (selectedModel) payload.model = selectedModel
+      const { result } = await api.post(endpoint, payload)
       messages = [...messages, { role: 'assistant', content: result }]
     } catch (e) {
       messages = [...messages, { role: 'assistant', content: `Error: ${e.message}` }]
@@ -70,6 +82,22 @@
 </script>
 
 <div class="flex flex-col h-full">
+  <!-- Model selector -->
+  {#if availableModels.length > 0}
+    <div class="px-3 pt-3 shrink-0">
+      <select
+        bind:value={selectedModel}
+        class="w-full text-xs border rounded px-2 py-1 bg-white text-gray-700"
+        title="Override the default AI model for this session"
+      >
+        <option value="">Default model</option>
+        {#each availableModels as m}
+          <option value={m}>{m}</option>
+        {/each}
+      </select>
+    </div>
+  {/if}
+
   <!-- Action buttons row -->
   <div class="p-3 border-b flex gap-2 shrink-0 flex-wrap">
     <button

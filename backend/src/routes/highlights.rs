@@ -18,13 +18,21 @@ pub fn router() -> Router<AppState> {
 }
 
 #[derive(Deserialize, Serialize, Clone)]
+pub struct HighlightRect {
+    pub left: f64,
+    pub top: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Highlight {
     pub id: String,
     pub page: u32,
     pub text: String,
     pub color: String,
-    pub range_start: usize,
-    pub range_end: usize,
+    pub rects: Vec<HighlightRect>,
+    pub created_at: Option<String>,
     pub note: Option<String>,
 }
 

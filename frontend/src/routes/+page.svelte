@@ -27,6 +27,19 @@
     }
   });
 
+  async function clearCache() {
+    const msg = $auth.user?.authenticated
+      ? 'Clear your session? Your documents will remain, but you will be logged out.'
+      : 'Clear all session data? This will permanently delete all your PDFs and chat history.'
+    if (!confirm(msg)) return
+    try {
+      await api.post('/auth/clear-cache', {})
+    } catch {
+      // ignore — session may already be gone
+    }
+    window.location.href = '/'
+  }
+
   async function handleUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -75,6 +88,11 @@
         <a href="/settings" class="text-sm text-gray-600 hover:text-gray-900">Settings</a>
         <a href="/api/auth/login" class="text-sm text-blue-600 hover:text-blue-800">Login</a>
       {/if}
+      <button
+        on:click={clearCache}
+        class="text-sm text-red-500 hover:text-red-700"
+        title="Delete all session data and start fresh"
+      >Clear Cache</button>
     </nav>
   </header>
 

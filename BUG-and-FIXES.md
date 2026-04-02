@@ -13,7 +13,26 @@ FRONTEND bugs
   confirm dialog, then gets a 401.
 12. Delete PDF feature wasn't present. Status: Implemented.
 13. Unable to select words/sentences inside PDF viewer for searching or asking AI for assistance. Status: Fixed. Added PDF.js TextLayer (pdfjs-dist 4.x API) rendered as a transparent positioned-span overlay on each page canvas. TextLayer instances are cancelled and recreated on zoom re-render and cleaned up on component destroy. Minimal text layer CSS added to app.css. Highlight overlay given explicit z-index:3 to remain above the text layer (z-index:2) while search overlay stays at z-index:5.
-14. The highlight option opens up but fill box color of the underlying text doesn't change. Status: Pending.
+14. The highlight option opens up but fill box color of the underlying text doesn't change. Status: Fixed. Two root causes resolved: (1) Backend Highlight struct had range_start/range_end fields that the frontend never sent — replaced with rects: Vec<HighlightRect> and created_at: Option<String> to match the frontend payload. (2) svelte:window on:mouseup fired before the color-button click handler, calling dismissPicker() and clearing pendingSelection before applyHighlight could run — fixed by returning early in onMouseUp when the picker is already visible, relying on the backdrop div for outside-click dismissal.
+15. During an anonymous session, 
+  a. Save the model output history and chat history in respective markdown file just next to pdf files.
+  b. The clear chat option to clear the content inside those file. 
+  c. There should also be a clear cache button on the home to clear all web and backend session data and start a fresh session.
+  Status: Implemented. append_chat_history() now also writes chat_history.md (timestamped Q&A entries) next to the PDF. run_quick_ai_task() calls new append_model_output_md() to append summary/keypoints results to model_output.md. clear_history endpoint zeroes both markdown files alongside chat_history.json. Added POST /api/auth/clear-cache backend endpoint (deletes session file + anonymous data dir for anonymous users, expires cookie). Home page gained a "Clear Cache" button that confirms, calls the endpoint, and reloads to a fresh session.
+16. Inside the AISidebar, there should be option to override the default model. This list of models should appear as dropdown list in the component and should be fetched from backend ollama/openAI compatible server. Status: Implemented. Added GET /api/ai/models backend endpoint: loads user AI config, derives the models URL by replacing the endpoint path with /v1/models (works for Ollama ≥0.3 and OpenAI), returns { models: [...] }. ChatRequest and DocRequest now accept an optional model field. When set, the per-request model overrides the configured default for that call. AISidebar fetches models on mount and renders a dropdown above the action buttons; selecting a model passes it with every chat / summary / keypoints request.
+17. The default model settings (endpoint, modelname, token) should be copied for every new session from backend configuration file "default.toml". If the user want, they can overwrite that on-demand. Even after clear cache, the new session should get default model settings. Status: Pending.
+18. The pinch zoom-in/zoom-out (from trackpad), scales the entire page instead of just the pdf. It should also work with mouse (Ctrl/Cmd + wheel up/down). Status: Pending.
+19. The settings page has no dedicated back button. Status: Pending.
+20. The text selection on the PDF has following bugs:
+  a. When selecting highligh option, its doesn't do anything right way. when the pdf is viewed again, those highlights do appear. 
+  b. Highlighting is currently zoom agnostic, messeses up the highlight placement when zoom is changed. 
+  c. Text selection is buggy. Doesn't cover the full text properly. For examples if the word is "language", the "g" letter is only half covered. 
+  Status: Pending.
+21. Still in the anonymous session, the previous chat history of the pdf is not shown. Status: Pending.
+22. Implement a page index (editable) and page change button. When user enters a specific page number in the page index, the pdf should go to that page. Status: Pending.
+22. The notes section has following bugs:
+  a. Shows notes for the last page number only. Notes should be for every page. Status: Pending.
+
 
 BACKEND bugs
 1. In model configuration, the frontend expected json output but inside backend/src/routes/ai.rs:save_ai_config returned only status code. Status: Fixed.

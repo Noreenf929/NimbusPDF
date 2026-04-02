@@ -21,12 +21,14 @@ pub fn router() -> Router<AppState> {
         .route("/keypoints", post(quick_keypoints))
         .route("/history/:doc_id", get(get_history).delete(clear_history))
         .route("/config", get(get_ai_config).post(save_ai_config))
+        .route("/models", get(list_models))
 }
 
 #[derive(Deserialize)]
 pub struct ChatRequest {
     pub doc_id: String,
     pub message: String,
+    pub model: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -37,6 +39,7 @@ pub struct ChatResponse {
 #[derive(Deserialize)]
 pub struct DocRequest {
     pub doc_id: String,
+    pub model: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -65,7 +68,7 @@ fn load_user_ai_config(
     toml::from_str::<UserAiConfig>(&toml_str).map_err(|e| anyhow::anyhow!("Invalid ai_config.toml: {}", e))
 }
 
-/// Append a message exchange to chat_history.json.
+/// Append a message exchange to chat_history.json and chat_history.md.
 fn append_chat_history(
     storage: &crate::storage::local::LocalStorage,
     principal: &Principal,
@@ -73,6 +76,9 @@ fn append_chat_history(
     user_message: &str,
     assistant_reply: &str,
 ) -> anyhow::Result<()> {
+    let now = chrono::Utc::now();
+
+    // JSON history
     let existing = storage
         .read_doc_file(principal, doc_id, "chat_history.json")
         .unwrap_or_else(|_| "[]".to_string());
@@ -81,19 +87,62 @@ fn append_chat_history(
     history.push(serde_json::json!({
         "role": "user",
         "content": user_message,
-        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "timestamp": now.to_rfc3339(),
     }));
     history.push(serde_json::json!({
         "role": "assistant",
         "content": assistant_reply,
-        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "timestamp": now.to_rfc3339(),
     }));
     storage.write_doc_file(
         principal,
         doc_id,
         "chat_history.json",
         &serde_json::to_string_pretty(&history)?,
-    )
+    )?;
+
+    // Markdown history (human-readable, lives next to the PDF)
+    let existing_md = storage
+        .read_doc_file(principal, doc_id, "chat_history.md")
+        .unwrap_or_default();
+    let ts = now.format("%Y-%m-%d %H:%M:%S UTC");
+    let entry = format!(
+        "## {ts}\n\n**User:** {user_message}\n\n**Assistant:** {assistant_reply}\n\n---\n\n"
+    );
+    let _ = storage.write_doc_file(
+        principal,
+        doc_id,
+        "chat_history.md",
+        &format!("{existing_md}{entry}"),
+    );
+
+    Ok(())
+}
+
+/// Append a model-generated result (summary / keypoints) to model_output.md.
+fn append_model_output_md(
+    storage: &crate::storage::local::LocalStorage,
+    principal: &Principal,
+    doc_id: &str,
+    task: &str,
+    output: &str,
+) {
+    let existing = storage
+        .read_doc_file(principal, doc_id, "model_output.md")
+        .unwrap_or_default();
+    let ts = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
+    let heading = match task {
+        "summary" => "Summary",
+        "keypoints" => "Key Points",
+        other => other,
+    };
+    let entry = format!("## {heading} — {ts}\n\n{output}\n\n---\n\n");
+    let _ = storage.write_doc_file(
+        principal,
+        doc_id,
+        "model_output.md",
+        &format!("{existing}{entry}"),
+    );
 }
 
 async fn chat(
@@ -154,9 +203,19 @@ async fn chat(
         content: chat_req.message.clone(),
     });
 
+    // Allow per-request model override
+    let effective_cfg = if let Some(ref model_override) = chat_req.model {
+        crate::ai::UserAiConfig {
+            model: model_override.clone(),
+            ..user_cfg
+        }
+    } else {
+        user_cfg
+    };
+
     let proxy = AiProxy::new_with_client(state.http_client.clone());
     let reply = proxy
-        .complete(&user_cfg, &system_prompt, messages)
+        .complete(&effective_cfg, &system_prompt, messages)
         .await
         .map_err(|e| (
             StatusCode::BAD_GATEWAY,
@@ -182,7 +241,7 @@ async fn quick_summary(
     Extension(handle): Extension<SessionHandle>,
     Json(req): Json<DocRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    run_quick_ai_task(state, handle, req.doc_id, "summary").await
+    run_quick_ai_task(state, handle, req.doc_id, "summary", req.model).await
 }
 
 async fn quick_keypoints(
@@ -190,7 +249,7 @@ async fn quick_keypoints(
     Extension(handle): Extension<SessionHandle>,
     Json(req): Json<DocRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    run_quick_ai_task(state, handle, req.doc_id, "keypoints").await
+    run_quick_ai_task(state, handle, req.doc_id, "keypoints", req.model).await
 }
 
 async fn run_quick_ai_task(
@@ -198,6 +257,7 @@ async fn run_quick_ai_task(
     handle: SessionHandle,
     doc_id: String,
     task: &str,
+    model_override: Option<String>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     let principal = Principal::from_session(&handle.data);
 
@@ -240,10 +300,20 @@ async fn run_quick_ai_task(
         Json(serde_json::json!({ "error": e.to_string() })),
     ))?;
 
+    // Allow per-request model override
+    let effective_cfg = if let Some(ref m) = model_override {
+        crate::ai::UserAiConfig {
+            model: m.clone(),
+            ..user_cfg
+        }
+    } else {
+        user_cfg
+    };
+
     let proxy = AiProxy::new_with_client(state.http_client.clone());
     let result = proxy
         .complete(
-            &user_cfg,
+            &effective_cfg,
             &system_prompt,
             vec![Message {
                 role: "user".to_string(),
@@ -255,6 +325,17 @@ async fn run_quick_ai_task(
             StatusCode::BAD_GATEWAY,
             Json(serde_json::json!({ "error": format!("AI request failed: {}", e) })),
         ))?;
+
+    // Save model output to markdown next to the PDF
+    let storage2 = Arc::clone(&state.storage);
+    let principal2 = principal.clone();
+    let doc_id2 = doc_id.clone();
+    let result2 = result.clone();
+    let task2 = task.to_string();
+    let _ = spawn_blocking(move || {
+        append_model_output_md(&storage2, &principal2, &doc_id2, &task2, &result2);
+    })
+    .await;
 
     Ok(Json(serde_json::json!({ "result": result })))
 }
@@ -287,7 +368,11 @@ async fn clear_history(
     let principal = Principal::from_session(&handle.data);
     let storage = Arc::clone(&state.storage);
     spawn_blocking(move || {
-        storage.write_doc_file(&principal, &doc_id, "chat_history.json", "[]")
+        storage.write_doc_file(&principal, &doc_id, "chat_history.json", "[]")?;
+        // Clear markdown files as well (best-effort, ignore errors)
+        let _ = storage.write_doc_file(&principal, &doc_id, "chat_history.md", "");
+        let _ = storage.write_doc_file(&principal, &doc_id, "model_output.md", "");
+        Ok::<_, anyhow::Error>(())
     })
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -358,4 +443,34 @@ async fn save_ai_config(
     Ok( (
         StatusCode::OK, Json(serde_json::json!({ "sucess": true }))
     ))
+}
+
+async fn list_models(
+    State(state): State<AppState>,
+    Extension(handle): Extension<SessionHandle>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let principal = Principal::from_session(&handle.data);
+    let storage = Arc::clone(&state.storage);
+
+    let user_cfg = spawn_blocking(move || load_user_ai_config(&storage, &principal))
+        .await
+        .map_err(|_| (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": "internal error" })),
+        ))?
+        .map_err(|e| (
+            StatusCode::FAILED_DEPENDENCY,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        ))?;
+
+    let proxy = AiProxy::new_with_client(state.http_client.clone());
+    let models = proxy
+        .list_models(&user_cfg)
+        .await
+        .map_err(|e| (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({ "error": format!("Failed to fetch models: {}", e) })),
+        ))?;
+
+    Ok(Json(serde_json::json!({ "models": models })))
 }

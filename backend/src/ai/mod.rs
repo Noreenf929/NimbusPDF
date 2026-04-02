@@ -73,6 +73,34 @@ impl AiProxy {
             .to_string();
         Ok(content)
     }
+
+    /// Fetch available model IDs from the AI server (OpenAI-compatible /v1/models).
+    /// Works with Ollama ≥0.3 and OpenAI.
+    pub async fn list_models(&self, user_cfg: &UserAiConfig) -> anyhow::Result<Vec<String>> {
+        let mut models_url: reqwest::Url = user_cfg
+            .endpoint_url
+            .parse()
+            .context("invalid endpoint_url")?;
+        models_url.set_path("/v1/models");
+        models_url.set_query(None);
+
+        let mut builder = self.client.get(models_url);
+        if let Some(key) = &user_cfg.api_key {
+            if !key.is_empty() {
+                builder = builder.bearer_auth(key);
+            }
+        }
+
+        let resp: serde_json::Value = builder.send().await?.json().await?;
+        let models: Vec<String> = resp["data"]
+            .as_array()
+            .unwrap_or(&vec![])
+            .iter()
+            .filter_map(|m| m["id"].as_str().map(|s| s.to_string()))
+            .collect();
+
+        Ok(models)
+    }
 }
 
 /// Load a prompt template from disk and substitute {document_context}.
